@@ -374,6 +374,15 @@ def inserir_usuario(usuario, senha_hash, salt, destino, nome, perfil, ativo=True
     limpar_cache()
 
 
+def inserir_usuarios_lote(rows: list[list]):
+    """Insere vários usuários de uma vez (cada `row` na ordem de CAB_USUARIOS)."""
+    if not rows:
+        return
+    ws = _aba(ABA_USUARIOS, CAB_USUARIOS)
+    ws.append_rows(rows, value_input_option="USER_ENTERED")
+    limpar_cache()
+
+
 def definir_ativo(linha: int, ativo: bool):
     """Atualiza a coluna 'ativo' (7ª) de uma linha específica."""
     ws = _aba(ABA_USUARIOS, CAB_USUARIOS)

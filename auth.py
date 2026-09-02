@@ -81,3 +81,47 @@ def criar_usuario(usuario, senha, destino, nome, perfil=PERFIL_OP, email="") -> 
     salt = gerar_salt()
     sheets.inserir_usuario(usuario, hash_senha(senha, salt), salt, destino, nome, perfil, email=email)
     return True, f'Usuário "{usuario}" criado com sucesso.'
+
+
+def preparar_usuario_row(usuario, senha, destino, nome, perfil, email, ocupados: set):
+    """Valida um registro para importação em massa e devolve a linha pronta para a planilha.
+
+    `ocupados` é o conjunto de logins já usados (existentes + os desta importação).
+    Retorna (row | None, erro | None). Não escreve nada.
+    """
+    from datetime import datetime
+
+    usuario = str(usuario or "").strip().lower()
+    senha = str(senha or "")
+    destino = str(destino or "").strip()
+    nome = str(nome or "").strip() or usuario
+    email = str(email or "").strip()
+    perfil = perfil if perfil in PERFIS_VALIDOS else PERFIL_OP
+
+    if perfil in (PERFIL_ADM, PERFIL_RECEB) and not destino:
+        destino = "*"
+    if not usuario or not senha or not destino:
+        return None, "usuário, senha e destino são obrigatórios"
+    if " " in usuario:
+        return None, "usuário não pode conter espaços"
+    if len(senha) < 6:
+        return None, "senha deve ter ao menos 6 caracteres"
+    if email and ("@" not in email or "." not in email.split("@")[-1]):
+        return None, "e-mail inválido"
+    if usuario in ocupados:
+        return None, "login duplicado"
+
+    salt = gerar_salt()
+    row = [usuario, hash_senha(senha, salt), salt, destino, nome, perfil,
+           "TRUE", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), email]
+    return row, None
+
+
+def normalizar_perfil(v) -> str:
+    """Converte rótulos livres de perfil para o valor canônico."""
+    s = str(v or "").strip().lower()
+    if s in ("admin", "administrador"):
+        return PERFIL_ADM
+    if s in ("recebimento", "recebedor"):
+        return PERFIL_RECEB
+    return PERFIL_OP
