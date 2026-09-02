@@ -90,8 +90,13 @@ def page_3():
                     min_value=0, max_value=int(q), step=1, value=0,
                 )
             placa = st.text_input("Placa do veículo", placeholder="ex.: ABC1D23")
-            local = st.text_input("Devolvendo para (local/CD de destino)",
-                                  placeholder="ex.: CD Cajamar")
+            destinos_cfg = dp.destinos_devolucao()
+            if destinos_cfg:
+                local = st.selectbox("Devolvendo para (local/CD de destino)",
+                                     [""] + destinos_cfg)
+            else:
+                local = st.text_input("Devolvendo para (local/CD de destino)",
+                                      placeholder="ex.: CD Cajamar")
             obs = st.text_input("Observação (opcional)")
             enviar = st.form_submit_button("Gerar devolução", type="primary")
 

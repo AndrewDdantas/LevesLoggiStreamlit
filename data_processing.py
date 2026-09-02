@@ -135,6 +135,19 @@ def fmt_brl(v) -> str:
     return "R$ " + f"{float(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def destinos_devolucao() -> list[str]:
+    """Lista de destinos/locais de devolução configurados (um por linha em config)."""
+    import re
+    raw = data_extraction.get_config().get("destinos_devolucao", "")
+    itens = [s.strip() for s in re.split(r"[\n;,]", str(raw)) if s.strip()]
+    seen, out = set(), []
+    for i in itens:
+        if i.lower() not in seen:
+            seen.add(i.lower())
+            out.append(i)
+    return out
+
+
 def base_url() -> str:
     """URL pública do app (para o QR). Configure [app].base_url no secrets."""
     b = ""

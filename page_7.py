@@ -55,6 +55,20 @@ def page_7():
         st.rerun()
 
     st.divider()
+    st.markdown("#### Destinos de devolução")
+    st.caption("Locais/CDs para onde as operações podem devolver. Um por linha. "
+               "Aparecem como lista suspensa no formulário de devolução.")
+    with st.form("destinos"):
+        destinos_txt = st.text_area(
+            "Destinos (um por linha)", value=cfg.get("destinos_devolucao", ""),
+            placeholder="CD Cajamar\nCD Guarulhos\nHub CJ2", height=120)
+        salvar_dest = st.form_submit_button("Salvar destinos", type="primary", width="stretch")
+    if salvar_dest:
+        dados.set_config({"destinos_devolucao": destinos_txt.strip()})
+        st.success("Destinos salvos.")
+        st.rerun()
+
+    st.divider()
     st.markdown("#### Valores dos itens (R$)")
     st.caption("Preço unitário por tipo de ativo. Usado para mostrar às operações quanto devem em dinheiro.")
     with st.form("precos"):
