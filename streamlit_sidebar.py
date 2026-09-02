@@ -30,7 +30,8 @@ def _estilos_extra():
         background: linear-gradient(180deg, #0067fc 0%, #0052d6 100%);
       }
       /* Botões da sidebar: contorno branco translúcido, texto branco legível */
-      [data-testid="stSidebar"] .stButton > button {
+      [data-testid="stSidebar"] .stButton > button,
+      [data-testid="stSidebar"] .stDownloadButton > button {
         background: rgba(255,255,255,0.12);
         color: #ffffff !important;
         border: 1px solid rgba(255,255,255,0.55);
@@ -38,12 +39,14 @@ def _estilos_extra():
         font-weight: 600;
         transition: all .15s ease;
       }
-      [data-testid="stSidebar"] .stButton > button:hover {
+      [data-testid="stSidebar"] .stButton > button:hover,
+      [data-testid="stSidebar"] .stDownloadButton > button:hover {
         background: #ffffff;
         color: #0067fc !important;
         border-color: #ffffff;
       }
-      [data-testid="stSidebar"] .stButton > button * { color: inherit !important; }
+      [data-testid="stSidebar"] .stButton > button *,
+      [data-testid="stSidebar"] .stDownloadButton > button * { color: inherit !important; }
       /* Radio de navegação */
       [data-testid="stSidebar"] [role="radiogroup"] label {
         color: #ffffff !important;

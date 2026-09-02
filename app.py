@@ -14,6 +14,7 @@ import streamlit as st
 
 import auth
 import contato
+import manual
 from streamlit_estilizador import PageStyler
 from streamlit_sidebar import sidebar
 
@@ -76,6 +77,8 @@ def tela_login():
                 st.session_state["tentativas"] += 1
                 st.error("Usuário ou senha inválidos.")
 
+        if manual.disponivel():
+            manual.botao_manual(key="manual_login")
         with st.expander("💬 Dúvidas? Fale com o suporte"):
             contato.form_contato(key="login")
 
@@ -130,6 +133,7 @@ def main():
             pagina = opcoes[0]
 
         st.markdown("<hr class='sb-sep'>", unsafe_allow_html=True)
+        manual.botao_manual(key="manual_side")
         if st.button("↻ Atualizar dados", width="stretch"):
             import data_extraction
             data_extraction.limpar_cache()

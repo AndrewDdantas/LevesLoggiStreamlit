@@ -16,6 +16,7 @@ import streamlit as st
 
 import data_extraction as dados
 import data_processing as dp
+import manual
 import romaneio
 
 
@@ -33,6 +34,9 @@ def page_3():
         "QR e envie impresso junto com os itens.</p>",
         unsafe_allow_html=True,
     )
+    if manual.disponivel():
+        with st.expander("📘 Manual de devolução (treinamento)"):
+            manual.botao_manual(key="manual_page3")
 
     # ---- Saldo a devolver ----
     saldo = dp.saldo_por_tipo(destino)
