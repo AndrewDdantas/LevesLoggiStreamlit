@@ -106,6 +106,35 @@ def rotulo_mes(mes: str) -> str:
     return f"{MESES_PT[int(mes[5:7])]}/{mes[:4]}"
 
 
+def _to_float(v) -> float:
+    """Converte texto de preço em float, aceitando '1.234,56' ou '1234.56'."""
+    s = str(v or "").strip().replace("R$", "").replace(" ", "")
+    if not s:
+        return 0.0
+    if "," in s and "." in s:
+        s = s.replace(".", "").replace(",", ".")
+    elif "," in s:
+        s = s.replace(",", ".")
+    try:
+        return float(s)
+    except ValueError:
+        return 0.0
+
+
+def precos() -> dict:
+    """Preço unitário por tipo (config preco_<TIPO>). 0 quando não definido."""
+    cfg = data_extraction.get_config()
+    return {t: _to_float(cfg.get(f"preco_{t}", "")) for t in CORES_TIPO}
+
+
+def tem_precos() -> bool:
+    return any(v > 0 for v in precos().values())
+
+
+def fmt_brl(v) -> str:
+    return "R$ " + f"{float(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
 def base_url() -> str:
     """URL pública do app (para o QR). Configure [app].base_url no secrets."""
     b = ""

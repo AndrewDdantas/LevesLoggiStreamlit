@@ -115,13 +115,38 @@ def _fmt(n) -> str:
     return f"{int(n):,}".replace(",", ".")
 
 
-def corpo_pendencia(operacao: str, itens: list[dict], total: int) -> str:
+def _brl(v) -> str:
+    return "R$ " + f"{float(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _tabela_itens(itens: list[dict], qtd_key: str, rot_qtd: str, precos: dict | None) -> tuple[str, float]:
+    """Monta as linhas da tabela e devolve (html, valor_total). Usa precos se houver."""
+    usa_valor = bool(precos) and any((precos or {}).get(str(it["tipo"]).upper(), 0) > 0 for it in itens)
+    linhas, valor_total, total_qtd = "", 0.0, 0
+    for it in itens:
+        q = int(it[qtd_key])
+        total_qtd += q
+        col_val = ""
+        if usa_valor:
+            v = q * float((precos or {}).get(str(it["tipo"]).upper(), 0))
+            valor_total += v
+            col_val = f"<td style='padding:6px 12px;border-bottom:1px solid #eee;text-align:right'>{_brl(v)}</td>"
+        linhas += (f"<tr><td style='padding:6px 12px;border-bottom:1px solid #eee'>{it['tipo'].title()}</td>"
+                   f"<td style='padding:6px 12px;border-bottom:1px solid #eee;text-align:right'>{_fmt(q)}</td>{col_val}</tr>")
+    th_val = "<th style='padding:8px 12px;text-align:right'>Valor</th>" if usa_valor else ""
+    td_val_total = (f"<td style='padding:8px 12px;font-weight:700;text-align:right'>{_brl(valor_total)}</td>"
+                    if usa_valor else "")
+    cabecalho = (f"<tr style='background:#f1f5fb'><th style='padding:8px 12px;text-align:left'>Tipo de ativo</th>"
+                 f"<th style='padding:8px 12px;text-align:right'>{rot_qtd}</th>{th_val}</tr>")
+    rodape = (f"<tr><td style='padding:8px 12px;font-weight:700'>Total</td>"
+              f"<td style='padding:8px 12px;font-weight:700;text-align:right'>{_fmt(total_qtd)}</td>{td_val_total}</tr>")
+    html = f"<table style='border-collapse:collapse;width:100%;margin:12px 0'>{cabecalho}{linhas}{rodape}</table>"
+    return html, valor_total
+
+
+def corpo_pendencia(operacao: str, itens: list[dict], total: int, precos: dict | None = None) -> str:
     """HTML do lembrete de pendência de devolução (itens ainda em aberto)."""
-    linhas = "".join(
-        f"<tr><td style='padding:6px 12px;border-bottom:1px solid #eee'>{it['tipo'].title()}</td>"
-        f"<td style='padding:6px 12px;border-bottom:1px solid #eee;text-align:right'>{_fmt(it['pendente'])}</td></tr>"
-        for it in itens
-    )
+    tabela, _ = _tabela_itens(itens, "pendente", "Pendente", precos)
     return f"""
     <div style="font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;max-width:560px">
       <div style="font-size:26px;font-weight:800;color:#0067fc">loggi</div>
@@ -129,36 +154,23 @@ def corpo_pendencia(operacao: str, itens: list[dict], total: int) -> str:
       <p>Olá, <b>{operacao}</b>.</p>
       <p>Consta a seguinte <b>pendência de devolução</b> de ativos com a sua operação.
       Por favor, programe a devolução o quanto antes:</p>
-      <table style="border-collapse:collapse;width:100%;margin:12px 0">
-        <tr style="background:#f1f5fb">
-          <th style="padding:8px 12px;text-align:left">Tipo de ativo</th>
-          <th style="padding:8px 12px;text-align:right">Pendente</th>
-        </tr>
-        {linhas}
-        <tr>
-          <td style="padding:8px 12px;font-weight:700">Total</td>
-          <td style="padding:8px 12px;font-weight:700;text-align:right">{_fmt(total)}</td>
-        </tr>
-      </table>
+      {tabela}
       <p style="color:#6e6e6e;font-size:13px">Aviso automático do Portal LEVES. Em caso de dúvida, responda a este e-mail.</p>
     </div>
     """
 
 
-def enviar_pendencia(destinatario: str, operacao: str, itens: list[dict], total: int) -> tuple[bool, str]:
+def enviar_pendencia(destinatario: str, operacao: str, itens: list[dict], total: int,
+                     precos: dict | None = None) -> tuple[bool, str]:
     """Envia o lembrete de pendência de devolução para um destinatário."""
     return enviar_email(destinatario, f"Pendência de devolução — {operacao} — Portal LEVES",
-                        corpo_pendencia(operacao, itens, total))
+                        corpo_pendencia(operacao, itens, total, precos))
 
 
 def corpo_cobranca(operacao: str, competencia_label: str, prazo: str,
-                   itens: list[dict], total: int) -> str:
+                   itens: list[dict], total: int, precos: dict | None = None) -> str:
     """Monta o HTML da cobrança (padrão visual Loggi)."""
-    linhas = "".join(
-        f"<tr><td style='padding:6px 12px;border-bottom:1px solid #eee'>{it['tipo'].title()}</td>"
-        f"<td style='padding:6px 12px;border-bottom:1px solid #eee;text-align:right'>{_fmt(it['qtd'])}</td></tr>"
-        for it in itens
-    )
+    tabela, _ = _tabela_itens(itens, "qtd", "Quantidade", precos)
     return f"""
     <div style="font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;max-width:560px">
       <div style="font-size:26px;font-weight:800;color:#0067fc">loggi</div>
@@ -166,17 +178,7 @@ def corpo_cobranca(operacao: str, competencia_label: str, prazo: str,
       <p>Olá, <b>{operacao}</b>.</p>
       <p>Referente à competência <b>{competencia_label}</b>, identificamos ativos enviados que
       <b>não foram devolvidos até o prazo</b> ({prazo}). Segue o detalhamento para acerto:</p>
-      <table style="border-collapse:collapse;width:100%;margin:12px 0">
-        <tr style="background:#f1f5fb">
-          <th style="padding:8px 12px;text-align:left">Tipo de ativo</th>
-          <th style="padding:8px 12px;text-align:right">Quantidade</th>
-        </tr>
-        {linhas}
-        <tr>
-          <td style="padding:8px 12px;font-weight:700">Total</td>
-          <td style="padding:8px 12px;font-weight:700;text-align:right">{_fmt(total)}</td>
-        </tr>
-      </table>
+      {tabela}
       <p style="color:#6e6e6e;font-size:13px">Este é um aviso automático do Portal LEVES.
       Em caso de dúvida, responda a este e-mail.</p>
     </div>

@@ -58,11 +58,18 @@ def page_6():
         return
 
     # ---- Totais ----
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Enviado no mês", _fmt(df["enviado"].sum()))
-    c2.metric("Devolvido", _fmt(df["devolvido"].sum()))
-    c3.metric("Já cobrado", _fmt(df["cobrado"].sum()))
-    c4.metric("Cobrável" if fechavel else "Em aberto", _fmt(df["cobravel"].sum()))
+    pr = dp.precos()
+    usa_valor = dp.tem_precos()
+    rot_cobravel = "Cobrável" if fechavel else "Em aberto"
+    ncols = 5 if usa_valor else 4
+    cs = st.columns(ncols)
+    cs[0].metric("Enviado no mês", _fmt(df["enviado"].sum()))
+    cs[1].metric("Devolvido", _fmt(df["devolvido"].sum()))
+    cs[2].metric("Já cobrado", _fmt(df["cobrado"].sum()))
+    cs[3].metric(rot_cobravel, _fmt(df["cobravel"].sum()))
+    if usa_valor:
+        valor_cobravel = sum(int(r["cobravel"]) * pr.get(r["tipo"], 0) for _, r in df.iterrows())
+        cs[4].metric(f"Valor {rot_cobravel.lower()}", dp.fmt_brl(valor_cobravel))
 
     st.markdown("---")
 
@@ -231,8 +238,15 @@ def _enviar_cobrancas_email(cobs_mes, competencia_label: str, prazo_txt: str):
         emails = _emails_do_destino(destino)
         grupos.append({"destino": destino, "itens": itens, "total": total, "emails": emails})
 
-    resumo = [{"Operação": x["destino"], "Total cobrado": x["total"],
-               "E-mail(s)": ", ".join(x["emails"]) or "— sem e-mail —"} for x in grupos]
+    pr = dp.precos()
+    usa_valor = dp.tem_precos()
+    resumo = []
+    for x in grupos:
+        linha = {"Operação": x["destino"], "Total cobrado": x["total"]}
+        if usa_valor:
+            linha["Valor"] = dp.fmt_brl(sum(it["qtd"] * pr.get(it["tipo"], 0) for it in x["itens"]))
+        linha["E-mail(s)"] = ", ".join(x["emails"]) or "— sem e-mail —"
+        resumo.append(linha)
     st.dataframe(resumo, width="stretch", hide_index=True)
 
     sem_email = [x["destino"] for x in grupos if not x["emails"]]
@@ -245,7 +259,7 @@ def _enviar_cobrancas_email(cobs_mes, competencia_label: str, prazo_txt: str):
             if not x["emails"]:
                 continue
             corpo = emailer.corpo_cobranca(x["destino"], competencia_label, prazo_txt,
-                                           x["itens"], x["total"])
+                                           x["itens"], x["total"], precos=pr)
             for email in x["emails"]:
                 ok, msg = emailer.enviar_email(
                     email, f"Cobrança de ativos — {competencia_label} — Portal LEVES", corpo)

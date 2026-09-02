@@ -42,10 +42,16 @@ def page_3():
 
     st.markdown("#### Saldo a devolver")
     tipos_com_saldo = saldo[saldo["saldo"] > 0]
+    pr = dp.precos()
     cols = st.columns(max(len(saldo), 1))
     for i, (_, r) in enumerate(saldo.iterrows()):
-        cols[i].metric(r["tipo"].title(), _fmt(r["saldo"]),
-                       help=f"Enviado: {_fmt(r['enviado'])} · Já devolvido: {_fmt(r['devolvido'])}")
+        ajuda = f"Enviado: {_fmt(r['enviado'])} · Já devolvido: {_fmt(r['devolvido'])}"
+        if pr.get(r["tipo"], 0) > 0:
+            ajuda += f" · {dp.fmt_brl(int(r['saldo']) * pr[r['tipo']])}"
+        cols[i].metric(r["tipo"].title(), _fmt(r["saldo"]), help=ajuda)
+    if dp.tem_precos():
+        total_val = sum(int(r["saldo"]) * pr.get(r["tipo"], 0) for _, r in saldo.iterrows())
+        st.markdown(f"**Valor total a devolver:** {dp.fmt_brl(total_val)}")
 
     st.markdown("<hr class='sb-sep' style='border-top-color:#e6e6e6;'>", unsafe_allow_html=True)
 

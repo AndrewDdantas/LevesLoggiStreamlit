@@ -10,6 +10,7 @@ from __future__ import annotations
 import streamlit as st
 
 import data_extraction as dados
+import data_processing as dp
 import emailer
 
 
@@ -51,6 +52,23 @@ def page_7():
             "email_suporte": suporte.strip(),
         })
         st.success("Configuração salva.")
+        st.rerun()
+
+    st.divider()
+    st.markdown("#### Valores dos itens (R$)")
+    st.caption("Preço unitário por tipo de ativo. Usado para mostrar às operações quanto devem em dinheiro.")
+    with st.form("precos"):
+        tipos = list(dp.CORES_TIPO.keys())
+        pcols = st.columns(len(tipos))
+        vals = {}
+        for i, t in enumerate(tipos):
+            atual = dp._to_float(cfg.get(f"preco_{t}", ""))
+            vals[t] = pcols[i].number_input(t.title(), min_value=0.0, value=float(atual),
+                                            step=1.0, format="%.2f", key=f"preco_{t}")
+        salvar_precos = st.form_submit_button("Salvar valores", type="primary", width="stretch")
+    if salvar_precos:
+        dados.set_config({f"preco_{t}": f"{v:.2f}" for t, v in vals.items()})
+        st.success("Valores salvos.")
         st.rerun()
 
     st.divider()

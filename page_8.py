@@ -47,9 +47,17 @@ def page_8():
 
     grupos = _grupos(pend)
     total_geral = sum(x["total"] for x in grupos)
-    c1, c2 = st.columns(2)
-    c1.metric("Operações com pendência", len(grupos))
-    c2.metric("Total de ativos pendentes", _fmt(total_geral))
+    pr = dp.precos()
+    usa_valor = dp.tem_precos()
+    for x in grupos:
+        x["valor"] = sum(it["pendente"] * pr.get(it["tipo"], 0) for it in x["itens"])
+    valor_geral = sum(x["valor"] for x in grupos)
+
+    cols = st.columns(3 if usa_valor else 2)
+    cols[0].metric("Operações com pendência", len(grupos))
+    cols[1].metric("Total de ativos pendentes", _fmt(total_geral))
+    if usa_valor:
+        cols[2].metric("Valor total pendente", dp.fmt_brl(valor_geral))
 
     # Gráfico: pendente por tipo
     tdf = pend.groupby("tipo", as_index=False)["pendente"].sum()
@@ -60,10 +68,13 @@ def page_8():
     st.plotly_chart(fig, width="stretch")
 
     # Tabela por operação
-    resumo = [{
-        "Operação": x["destino"], "Total pendente": x["total"],
-        "E-mail(s)": ", ".join(x["emails"]) or "— sem e-mail —",
-    } for x in grupos]
+    resumo = []
+    for x in grupos:
+        linha = {"Operação": x["destino"], "Total pendente": x["total"]}
+        if usa_valor:
+            linha["Valor"] = dp.fmt_brl(x["valor"])
+        linha["E-mail(s)"] = ", ".join(x["emails"]) or "— sem e-mail —"
+        resumo.append(linha)
     st.dataframe(resumo, width="stretch", hide_index=True)
 
     sem_email = [x["destino"] for x in grupos if not x["emails"]]
@@ -101,9 +112,10 @@ def page_8():
 
 
 def _enviar_grupo(x, silencioso=False):
+    pr = dp.precos()
     enviados, falhas = 0, []
     for email in x["emails"]:
-        ok, msg = emailer.enviar_pendencia(email, x["destino"], x["itens"], x["total"])
+        ok, msg = emailer.enviar_pendencia(email, x["destino"], x["itens"], x["total"], precos=pr)
         if ok:
             enviados += 1
         else:
