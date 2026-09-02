@@ -28,6 +28,7 @@ from page_5 import page_5  # noqa: E402
 from page_6 import page_6  # noqa: E402
 from page_7 import page_7  # noqa: E402
 from page_8 import page_8  # noqa: E402
+from page_9 import page_9  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -120,7 +121,7 @@ def main():
             opcoes = ["📦 Envios", "📥 Recebimento", "🧾 Conciliação", "🔔 Pendências",
                       "👥 Usuários", "📊 Relatórios", "⚙️ Configurações"]
         else:
-            opcoes = ["📦 Envios", "↩️ Devoluções"]
+            opcoes = ["📦 Envios", "↩️ Devoluções", "💰 Cobranças"]
 
         # Se veio de um QR, já abre o Recebimento.
         idx = 0
@@ -161,6 +162,8 @@ def main():
             page_4(scan_id if (eh_admin or eh_receb) else None, scan_token)
         elif "Devoluções" in pagina:
             page_3()
+        elif "Cobranças" in pagina:
+            page_9()
         else:
             page_1()
     except Exception as e:  # noqa: BLE001
