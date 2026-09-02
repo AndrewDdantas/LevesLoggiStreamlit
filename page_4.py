@@ -57,8 +57,12 @@ def _card_devolucao(dev: dict, quem: str):
     c2.markdown(f"**Destino:** {dev.get('destino','')}")
     c3.markdown(f"**Placa:** {dev.get('placa','') or '—'}")
     c4.markdown(f"**Emissão:** {dev.get('data_criacao','')}")
+    comp = str(dev.get("competencia", "") or "")
+    comp_txt = dp.rotulo_mes(comp) if len(comp) == 7 else "—"
+    extra = f"**Competência:** {comp_txt}"
     if dev.get("local_devolucao"):
-        st.markdown(f"**Devolvendo para:** {dev.get('local_devolucao')}")
+        extra += f"  ·  **Devolvendo para:** {dev.get('local_devolucao')}"
+    st.markdown(extra)
 
     # Já processada?
     if dev.get("status") != dp.STATUS_TRANSITO:

@@ -51,16 +51,33 @@ def page_3():
 
     # ---- Nova devolução ----
     st.markdown("#### Nova devolução")
-    if tipos_com_saldo.empty:
-        st.success("Você não tem saldo pendente de devolução. 🎉")
+    elegiveis = dp.competencias_elegiveis(destino)
+    if not elegiveis:
+        st.info("Nenhuma competência aberta para devolução (prazos encerrados).")
+        _minhas_devolucoes(destino)
+        return
+
+    # Competência (mês) — fora do form para recalcular a pendência ao trocar.
+    rot_mes = {m: dp.rotulo_mes(m) for m in elegiveis}
+    escolha_mes = st.selectbox("Mês de referência (competência)",
+                               [rot_mes[m] for m in elegiveis],
+                               help="Você pode devolver retroativo, dentro do prazo (até o dia 5 do mês seguinte).")
+    mes_ref = next(m for m, r in rot_mes.items() if r == escolha_mes)
+    prazo_txt = dp.prazo_devolucao(mes_ref).strftime("%d/%m/%Y")
+    st.caption(f"Devoluções de {escolha_mes} aceitas até **{prazo_txt}**.")
+
+    pend = {t: q for t, q in dp.pending_mes_tipo(destino, mes_ref).items() if q > 0}
+    if not pend:
+        st.success(f"Sem pendência de devolução para {escolha_mes}. 🎉")
     else:
         with st.form("nova_devolucao", clear_on_submit=True):
             qtds = {}
-            fcols = st.columns(len(tipos_com_saldo))
-            for i, (_, r) in enumerate(tipos_com_saldo.iterrows()):
-                qtds[r["tipo"]] = fcols[i].number_input(
-                    f"{r['tipo'].title()} (máx. {_fmt(r['saldo'])})",
-                    min_value=0, max_value=int(r["saldo"]), step=1, value=0,
+            itens_pend = sorted(pend.items())
+            fcols = st.columns(len(itens_pend))
+            for i, (t, q) in enumerate(itens_pend):
+                qtds[t] = fcols[i].number_input(
+                    f"{t.title()} (máx. {_fmt(q)})",
+                    min_value=0, max_value=int(q), step=1, value=0,
                 )
             placa = st.text_input("Placa do veículo", placeholder="ex.: ABC1D23")
             local = st.text_input("Devolvendo para (local/CD de destino)",
@@ -90,6 +107,7 @@ def page_3():
                     "total_declarado": total, "total_recebido": "",
                     "data_recebimento": "", "recebido_por": "", "obs": obs,
                     "placa": placa_norm, "local_devolucao": local_norm,
+                    "competencia": mes_ref,
                 }
                 dados.criar_devolucao(dev, itens)
                 st.success(f"Devolução **{id_dev}** criada. Baixe o romaneio abaixo e envie com os itens.")
@@ -99,7 +117,10 @@ def page_3():
                     mime="application/pdf", key=f"dl_{id_dev}", type="primary",
                 )
 
-    # ---- Minhas devoluções ----
+    _minhas_devolucoes(destino)
+
+
+def _minhas_devolucoes(destino: str):
     st.markdown("#### Minhas devoluções")
     devs = dp.devolucoes_df()
     if devs.empty:
@@ -114,7 +135,9 @@ def page_3():
     for _, d in minhas.iterrows():
         with st.container(border=True):
             c1, c2, c3, c4 = st.columns([2, 1.4, 1, 1.2])
-            c1.markdown(f"**{d['id']}**  \n{d['data_criacao']}")
+            comp = d.get("competencia")
+            comp_txt = f"  \n🗓️ {dp.rotulo_mes(comp)}" if comp and len(str(comp)) == 7 else ""
+            c1.markdown(f"**{d['id']}**  \n{d['data_criacao']}{comp_txt}")
             c2.markdown(dp.STATUS_LABEL.get(d["status"], d["status"])
                         + (f"  \n🚚 {d.get('placa')}" if d.get("placa") else ""))
             c3.markdown(f"Total: **{_fmt(d['total_declarado'])}**")

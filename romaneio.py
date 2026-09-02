@@ -87,8 +87,11 @@ def gerar_romaneio_pdf(dev: dict, itens: list[dict], base_url: str) -> bytes:
         c.drawString(x + 45 * mm, y, str(val))
         y -= 15
 
+    comp = str(dev.get("competencia", "") or "")
+    comp_txt = f"{comp[5:7]}/{comp[:4]}" if len(comp) == 7 else "—"
     linha("Operação:", dev.get("usuario", ""))
     linha("Destino:", dev.get("destino", ""))
+    linha("Competência (mês):", comp_txt)
     linha("Devolver para:", dev.get("local_devolucao", "") or "—")
     linha("Veículo (placa):", dev.get("placa", "") or "—")
     linha("Data de emissão:", dev.get("data_criacao", ""))

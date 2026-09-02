@@ -34,7 +34,7 @@ CAB_CONFIG = ["chave", "valor"]
 CAB_DEVOLUCOES = [
     "id", "token", "data_criacao", "usuario", "destino", "status",
     "total_declarado", "total_recebido", "data_recebimento", "recebido_por", "obs",
-    "placa", "local_devolucao",
+    "placa", "local_devolucao", "competencia",
 ]
 CAB_DEV_ITENS = ["id_devolucao", "tipo", "qtd_declarada", "qtd_recebida"]
 CAB_COBRANCAS = ["id", "data", "competencia", "destino", "tipo", "qtd", "prazo_dias", "gerado_por"]

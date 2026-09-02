@@ -217,6 +217,60 @@ def _cutoff_competencia(mes: str) -> pd.Timestamp:
     return min(prazo_devolucao(mes), pd.Timestamp.now())
 
 
+def _competencia_do_dev(row) -> str:
+    """Competência de uma devolução: o campo escolhido; senão, o mês da criação (legado)."""
+    c = str(row.get("competencia", "") or "").strip()
+    if c:
+        return c
+    dt = pd.to_datetime(row.get("data_criacao"), errors="coerce")
+    return dt.to_period("M").strftime("%Y-%m") if pd.notna(dt) else ""
+
+
+def competencias_elegiveis(destino: str) -> list[str]:
+    """Meses (competências) que a operação ainda pode devolver: dentro do prazo (até dia 5 do mês seguinte)."""
+    env = envios_df()
+    if env.empty:
+        return []
+    alvo = _normalizar(destino)
+    e = env[env["destino"].map(_normalizar) == alvo]
+    if e.empty:
+        return []
+    now = pd.Timestamp.now()
+    meses = sorted(set(e["mes"]), reverse=True)
+    return [m for m in meses if now <= prazo_devolucao(m)]
+
+
+def pending_mes_tipo(destino: str, mes: str) -> dict:
+    """Pendência por tipo de UMA competência: enviado no mês − devolvido(comp==mes) − cobrado(comp==mes)."""
+    alvo = _normalizar(destino)
+    per = pd.Period(mes, freq="M")
+    ini, fim = per.start_time, per.end_time
+
+    env = envios_df()
+    enviado = {}
+    if not env.empty:
+        e = env[(env["destino"].map(_normalizar) == alvo) & (env["dt"] >= ini) & (env["dt"] <= fim)]
+        enviado = e.groupby("tipo")["total"].sum().to_dict()
+
+    devolvido = {}
+    devs = devolucoes_df()
+    its = itens_df()
+    if not devs.empty and not its.empty:
+        d = devs[(devs["destino"].map(_normalizar) == alvo)
+                 & (devs["status"].isin(STATUS_COMPROMETIDOS))].copy()
+        if not d.empty:
+            d["comp"] = d.apply(_competencia_do_dev, axis=1)
+            d = d[d["comp"] == mes]
+            it = its[its["id_devolucao"].isin(set(d["id"]))]
+            devolvido = it.groupby("tipo")["qtd_declarada"].sum().to_dict()
+
+    cobrado = {t: q for (dn, t), q in _cobrado_por_competencia(mes, ate=False).items() if dn == alvo}
+
+    tipos = set(enviado) | set(devolvido) | set(cobrado)
+    return {t: max(int(enviado.get(t, 0)) - int(devolvido.get(t, 0)) - int(cobrado.get(t, 0)), 0)
+            for t in tipos}
+
+
 def _consome_fifo(lots: list, retornado: float) -> list:
     """Consome `retornado` dos lotes mais antigos (FIFO). Devolve os lotes restantes."""
     r = retornado
@@ -346,15 +400,41 @@ def _cobrado_por_competencia(mes: str, ate: bool = True) -> dict:
     return {k: int(v) for k, v in g.items()}
 
 
+def _recebido_por_competencia(mes: str, cutoff: pd.Timestamp) -> dict:
+    """Qtd recebida por (destino_norm, tipo) das devoluções da competência `mes`, até o corte."""
+    devs = devolucoes_df()
+    its = itens_df()
+    if devs.empty or its.empty:
+        return {}
+    d = devs[devs["status"].isin(STATUS_RECEBIDOS)].copy()
+    if d.empty:
+        return {}
+    d["dt_receb"] = pd.to_datetime(d["data_recebimento"], errors="coerce")
+    d = d[d["dt_receb"].notna() & (d["dt_receb"] <= cutoff)]
+    if d.empty:
+        return {}
+    d["comp"] = d.apply(_competencia_do_dev, axis=1)
+    d = d[d["comp"] == mes]
+    if d.empty:
+        return {}
+    d["destino_norm"] = d["destino"].map(_normalizar)
+    mapa = d.set_index("id")["destino_norm"].to_dict()
+    it = its[its["id_devolucao"].isin(set(d["id"]))].copy()
+    it["q"] = it["qtd_recebida"].fillna(it["qtd_declarada"])
+    it["destino_norm"] = it["id_devolucao"].map(mapa)
+    it = it.dropna(subset=["destino_norm"])
+    g = it.groupby(["destino_norm", "tipo"])["q"].sum()
+    return {k: int(v) for k, v in g.items()}
+
+
 def conciliacao(mes: str) -> pd.DataFrame:
-    """Concilia por competência (mês). Cobrança fecha após o dia 5 do mês seguinte.
+    """Concilia por competência (mês). A devolução informa a competência a que se refere.
 
     Colunas: destino, tipo, enviado, devolvido, cobrado, em_aberto, cobravel
       - enviado: enviado NO mês `mes`
-      - devolvido: quanto do enviado do mês já foi coberto por devoluções (FIFO)
+      - devolvido: recebido de devoluções cuja competência == mes (até o dia 5 do mês seguinte)
       - cobrado: já baixado por cobrança desta competência
       - em_aberto / cobravel: enviado do mês ainda não devolvido nem cobrado
-        (contando devoluções recebidas até o dia 5 do mês seguinte)
     """
     cols = ["destino", "tipo", "enviado", "devolvido", "cobrado", "em_aberto", "cobravel"]
     env = envios_df()
@@ -362,36 +442,28 @@ def conciliacao(mes: str) -> pd.DataFrame:
         return pd.DataFrame(columns=cols)
 
     per = pd.Period(mes, freq="M")
-    fim_mes = per.end_time
+    ini, fim = per.start_time, per.end_time
     cutoff = _cutoff_competencia(mes)
 
-    # Lotes até o fim do mês da competência (meses anteriores + o mês M).
-    envc = env[env["dt"] <= fim_mes].copy()
+    envc = env[(env["dt"] >= ini) & (env["dt"] <= fim)].copy()  # só os envios do mês da competência
     if envc.empty:
         return pd.DataFrame(columns=cols)
     envc["destino_norm"] = envc["destino"].map(_normalizar)
+    enviado = envc.groupby(["destino_norm", "tipo"])["total"].sum()
+    disp = envc.groupby("destino_norm")["destino"].first().to_dict()
 
-    recebido = _recebido_por_chave(cutoff)              # devoluções recebidas até dia 5 do mês seguinte
-    cobrado_ate = _cobrado_por_competencia(mes, ate=True)   # cobrado em competências <= mes (consome FIFO)
-    cobrado_mes = _cobrado_por_competencia(mes, ate=False)  # cobrado nesta competência (exibição)
+    recebido = _recebido_por_competencia(mes, cutoff)
+    cobrado_mes = _cobrado_por_competencia(mes, ate=False)
 
     linhas = []
-    for (dn, tipo), grp in envc.groupby(["destino_norm", "tipo"]):
-        lots = sorted(((r["dt"], int(r["total"])) for _, r in grp.iterrows()), key=lambda t: t[0])
-        enviado_mes = sum(q for d, q in lots if per.start_time <= d <= fim_mes)
-        if enviado_mes == 0:
-            continue
-        consumo = int(recebido.get((dn, tipo), 0)) + int(cobrado_ate.get((dn, tipo), 0))
-        rem = _consome_fifo(lots, consumo)  # devoluções e cobranças consomem os lotes mais antigos
-        # Do que sobrou, o que é do mês da competência.
-        em_aberto_mes = sum(q for d, q in rem if per.start_time <= d <= fim_mes)
+    for (dn, tipo), env_v in enviado.items():
+        env_i = int(env_v)
+        r = int(recebido.get((dn, tipo), 0))
+        cb = int(cobrado_mes.get((dn, tipo), 0))
+        em_aberto = max(env_i - r - cb, 0)
         linhas.append({
-            "destino": grp["destino"].iloc[0],
-            "tipo": tipo,
-            "enviado": enviado_mes,
-            "devolvido": enviado_mes - em_aberto_mes - min(int(cobrado_mes.get((dn, tipo), 0)), enviado_mes),
-            "cobrado": min(int(cobrado_mes.get((dn, tipo), 0)), enviado_mes),
-            "em_aberto": em_aberto_mes,
-            "cobravel": em_aberto_mes,
+            "destino": disp.get(dn, dn), "tipo": tipo, "enviado": env_i,
+            "devolvido": min(r, env_i), "cobrado": min(cb, env_i),
+            "em_aberto": em_aberto, "cobravel": em_aberto,
         })
     return pd.DataFrame(linhas, columns=cols).sort_values(["destino", "tipo"]).reset_index(drop=True)
