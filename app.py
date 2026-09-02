@@ -26,6 +26,7 @@ from page_4 import page_4  # noqa: E402
 from page_5 import page_5  # noqa: E402
 from page_6 import page_6  # noqa: E402
 from page_7 import page_7  # noqa: E402
+from page_8 import page_8  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -113,8 +114,8 @@ def main():
         if eh_receb:
             opcoes = ["📥 Recebimento"]
         elif eh_admin:
-            opcoes = ["📦 Envios", "📥 Recebimento", "🧾 Conciliação", "👥 Usuários",
-                      "📊 Relatórios", "⚙️ Configurações"]
+            opcoes = ["📦 Envios", "📥 Recebimento", "🧾 Conciliação", "🔔 Pendências",
+                      "👥 Usuários", "📊 Relatórios", "⚙️ Configurações"]
         else:
             opcoes = ["📦 Envios", "↩️ Devoluções"]
 
@@ -146,6 +147,8 @@ def main():
             page_2()
         elif "Conciliação" in pagina:
             page_6()
+        elif "Pendências" in pagina:
+            page_8()
         elif "Relatórios" in pagina:
             page_5()
         elif "Configurações" in pagina:

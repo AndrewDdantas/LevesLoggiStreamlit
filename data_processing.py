@@ -255,6 +255,52 @@ def _recebido_por_chave(cutoff: pd.Timestamp) -> dict:
     return {k: int(v) for k, v in g.items()}
 
 
+def emails_por_destino(destino: str) -> list[str]:
+    """E-mails dos usuários ativos daquele destino (para cobrança/lembrete)."""
+    alvo = _normalizar(destino)
+    return [u["email"] for u in data_extraction.ler_usuarios()
+            if u.get("email") and u.get("ativo") and _normalizar(u["destino"]) == alvo]
+
+
+def pendencias_df() -> pd.DataFrame:
+    """Pendência de devolução por destino×tipo (em aberto = enviado − devolvido − cobrado).
+
+    Considera TODO o período (não é por competência). Só linhas com pendente > 0.
+    """
+    cols = ["destino", "tipo", "enviado", "devolvido", "cobrado", "pendente"]
+    env = envios_df()
+    if env.empty:
+        return pd.DataFrame(columns=cols)
+    env = env.copy()
+    env["destino_norm"] = env["destino"].map(_normalizar)
+    enviado = env.groupby(["destino_norm", "tipo"])["total"].sum()
+    disp = env.groupby("destino_norm")["destino"].first().to_dict()
+
+    devolvido = {}
+    devs = devolucoes_df()
+    its = itens_df()
+    if not devs.empty and not its.empty:
+        d = devs[devs["status"].isin(STATUS_COMPROMETIDOS)].copy()
+        d["destino_norm"] = d["destino"].map(_normalizar)
+        mapa = d.set_index("id")["destino_norm"].to_dict()
+        it = its[its["id_devolucao"].isin(set(d["id"]))].copy()
+        it["destino_norm"] = it["id_devolucao"].map(mapa)
+        it = it.dropna(subset=["destino_norm"])
+        devolvido = it.groupby(["destino_norm", "tipo"])["qtd_declarada"].sum().to_dict()
+
+    cobrado = _cobrado_por_chave(pd.Timestamp.now())
+
+    linhas = []
+    for (dn, tipo), env_v in enviado.items():
+        dev_v = int(devolvido.get((dn, tipo), 0))
+        cob_v = int(cobrado.get((dn, tipo), 0))
+        pend = max(int(env_v) - dev_v - cob_v, 0)
+        if pend > 0:
+            linhas.append({"destino": disp.get(dn, dn), "tipo": tipo, "enviado": int(env_v),
+                           "devolvido": dev_v, "cobrado": cob_v, "pendente": pend})
+    return pd.DataFrame(linhas, columns=cols).sort_values(["destino", "tipo"]).reset_index(drop=True)
+
+
 def cobrancas_df() -> pd.DataFrame:
     """Histórico de cobranças fechadas (aba Cobrancas)."""
     cobs = data_extraction.ler_cobrancas()

@@ -115,6 +115,42 @@ def _fmt(n) -> str:
     return f"{int(n):,}".replace(",", ".")
 
 
+def corpo_pendencia(operacao: str, itens: list[dict], total: int) -> str:
+    """HTML do lembrete de pendência de devolução (itens ainda em aberto)."""
+    linhas = "".join(
+        f"<tr><td style='padding:6px 12px;border-bottom:1px solid #eee'>{it['tipo'].title()}</td>"
+        f"<td style='padding:6px 12px;border-bottom:1px solid #eee;text-align:right'>{_fmt(it['pendente'])}</td></tr>"
+        for it in itens
+    )
+    return f"""
+    <div style="font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;max-width:560px">
+      <div style="font-size:26px;font-weight:800;color:#0067fc">loggi</div>
+      <div style="color:#6e6e6e;letter-spacing:2px;text-transform:uppercase;font-size:11px;margin-bottom:16px">Portal LEVES</div>
+      <p>Olá, <b>{operacao}</b>.</p>
+      <p>Consta a seguinte <b>pendência de devolução</b> de ativos com a sua operação.
+      Por favor, programe a devolução o quanto antes:</p>
+      <table style="border-collapse:collapse;width:100%;margin:12px 0">
+        <tr style="background:#f1f5fb">
+          <th style="padding:8px 12px;text-align:left">Tipo de ativo</th>
+          <th style="padding:8px 12px;text-align:right">Pendente</th>
+        </tr>
+        {linhas}
+        <tr>
+          <td style="padding:8px 12px;font-weight:700">Total</td>
+          <td style="padding:8px 12px;font-weight:700;text-align:right">{_fmt(total)}</td>
+        </tr>
+      </table>
+      <p style="color:#6e6e6e;font-size:13px">Aviso automático do Portal LEVES. Em caso de dúvida, responda a este e-mail.</p>
+    </div>
+    """
+
+
+def enviar_pendencia(destinatario: str, operacao: str, itens: list[dict], total: int) -> tuple[bool, str]:
+    """Envia o lembrete de pendência de devolução para um destinatário."""
+    return enviar_email(destinatario, f"Pendência de devolução — {operacao} — Portal LEVES",
+                        corpo_pendencia(operacao, itens, total))
+
+
 def corpo_cobranca(operacao: str, competencia_label: str, prazo: str,
                    itens: list[dict], total: int) -> str:
     """Monta o HTML da cobrança (padrão visual Loggi)."""
