@@ -37,6 +37,10 @@ def page_7():
                                   placeholder="ex.: Portal LEVES <cobranca@empresa.com>")
         usar_tls = st.checkbox("Usar TLS (STARTTLS na porta 587)",
                                value=str(cfg.get("smtp_tls", "true")).lower() in ("true", "1", "sim"))
+        st.markdown("**Canal de dúvidas**")
+        suporte = st.text_input("E-mail que recebe as dúvidas da operação",
+                                value=cfg.get("email_suporte", ""),
+                                placeholder="ex.: suporte.leves@empresa.com")
         salvar = st.form_submit_button("Salvar configuração", type="primary", width="stretch")
 
     if salvar:
@@ -44,6 +48,7 @@ def page_7():
             "smtp_host": host.strip(), "smtp_port": port.strip(), "smtp_user": user.strip(),
             "smtp_password": pwd, "smtp_from": remetente.strip(),
             "smtp_tls": "true" if usar_tls else "false",
+            "email_suporte": suporte.strip(),
         })
         st.success("Configuração salva.")
         st.rerun()

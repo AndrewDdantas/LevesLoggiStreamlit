@@ -13,6 +13,7 @@ from __future__ import annotations
 import streamlit as st
 
 import auth
+import contato
 from streamlit_estilizador import PageStyler
 from streamlit_sidebar import sidebar
 
@@ -74,6 +75,9 @@ def tela_login():
                 st.session_state["tentativas"] += 1
                 st.error("Usuário ou senha inválidos.")
 
+        with st.expander("💬 Dúvidas? Fale com o suporte"):
+            contato.form_contato(key="login")
+
 
 # ---------------------------------------------------------------------------
 # Main
@@ -132,6 +136,10 @@ def main():
         if st.button("Sair", width="stretch"):
             logout()
             st.rerun()
+
+        with st.expander("💬 Dúvidas / suporte"):
+            contato.form_contato(key="app", nome=user.get("nome", ""),
+                                 email=user.get("email", ""))
 
     try:
         if "Usuários" in pagina:

@@ -47,7 +47,8 @@ def _abrir_conexao(c: dict):
     return server
 
 
-def enviar_email(destinatario: str, assunto: str, corpo_html: str) -> tuple[bool, str]:
+def enviar_email(destinatario: str, assunto: str, corpo_html: str,
+                 reply_to: str | None = None) -> tuple[bool, str]:
     """Envia um e-mail HTML. Retorna (ok, mensagem)."""
     destinatario = (destinatario or "").strip()
     if not destinatario:
@@ -60,6 +61,8 @@ def enviar_email(destinatario: str, assunto: str, corpo_html: str) -> tuple[bool
     msg["Subject"] = assunto
     msg["From"] = remetente
     msg["To"] = destinatario
+    if reply_to:
+        msg["Reply-To"] = reply_to
     msg.attach(MIMEText(corpo_html, "html", "utf-8"))
     try:
         server = _abrir_conexao(c)
@@ -68,6 +71,44 @@ def enviar_email(destinatario: str, assunto: str, corpo_html: str) -> tuple[bool
         return True, f"E-mail enviado para {destinatario}."
     except Exception as e:  # noqa: BLE001
         return False, f"Falha ao enviar para {destinatario}: {e}"
+
+
+def email_suporte() -> str:
+    """E-mail que recebe as dúvidas enviadas pela operação (config email_suporte)."""
+    return str(config_smtp().get("email_suporte", "")).strip()
+
+
+def enviar_duvida(nome: str, email_remetente: str, mensagem: str) -> tuple[bool, str]:
+    """Envia uma dúvida da operação para o e-mail de suporte configurado."""
+    nome = (nome or "").strip()
+    email_remetente = (email_remetente or "").strip()
+    mensagem = (mensagem or "").strip()
+    if not mensagem:
+        return False, "Escreva sua mensagem."
+    if not email_remetente or "@" not in email_remetente:
+        return False, "Informe um e-mail válido para contato."
+    destino = email_suporte()
+    if not destino:
+        return False, "Canal de dúvidas indisponível (suporte não configurado)."
+    if not smtp_configurado():
+        return False, "Envio indisponível no momento. Tente mais tarde."
+
+    corpo = f"""
+    <div style="font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;max-width:560px">
+      <div style="font-size:22px;font-weight:800;color:#0067fc">loggi</div>
+      <div style="color:#6e6e6e;letter-spacing:2px;text-transform:uppercase;font-size:11px;margin-bottom:14px">Portal LEVES · Dúvida</div>
+      <p><b>De:</b> {nome or '(sem nome)'} &lt;{email_remetente}&gt;</p>
+      <p><b>Mensagem:</b></p>
+      <div style="background:#f1f5fb;border-radius:8px;padding:12px 14px;white-space:pre-wrap">{_escape(mensagem)}</div>
+      <p style="color:#6e6e6e;font-size:12px;margin-top:14px">Responda diretamente a este e-mail para falar com a operação.</p>
+    </div>
+    """
+    return enviar_email(destino, f"[Dúvida Portal LEVES] {nome or email_remetente}",
+                        corpo, reply_to=email_remetente)
+
+
+def _escape(s: str) -> str:
+    return (str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
 
 
 def _fmt(n) -> str:
