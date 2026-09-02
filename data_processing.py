@@ -34,7 +34,12 @@ CORES_TIPO = {
     "SACA": "#0067fc",
     "GAYLORD": "#00baff",
     "ROLLCONTAINER": "#FFD580",
+    "PALLET": "#B5651D",  # derivado 1:1 do GAYLORD
 }
+
+# Tipos derivados: para cada GAYLORD enviado, vai 1 PALLET (critério).
+TIPO_ORIGEM_DERIVADO = "GAYLORD"
+TIPO_DERIVADO = "PALLET"
 
 # Estados de uma devolução.
 STATUS_TRANSITO = "EM_TRANSITO"
@@ -71,6 +76,15 @@ def envios_df() -> pd.DataFrame:
     df["tipo"] = df["tipo"].astype(str).str.upper().str.strip()
     df["destino"] = df["destino"].astype(str).str.strip()
     df["total"] = pd.to_numeric(df["total"], errors="coerce").fillna(0)
+
+    # PALLET é derivado 1:1 do GAYLORD (para cada gaylord enviado, 1 pallet).
+    # Só deriva se a planilha ainda não trouxer PALLET como tipo próprio.
+    if TIPO_DERIVADO not in set(df["tipo"]):
+        gay = df[df["tipo"] == TIPO_ORIGEM_DERIVADO].copy()
+        if not gay.empty:
+            gay["tipo"] = TIPO_DERIVADO
+            df = pd.concat([df, gay], ignore_index=True)
+
     df["mes"] = df["dt"].dt.to_period("M").astype(str)  # "2026-08"
     df["dia"] = df["dt"].dt.date
     return df
