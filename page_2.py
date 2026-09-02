@@ -129,23 +129,68 @@ def page_2():
 
     with dir_:
         st.markdown("<p class='subtitle'>Usuários cadastrados</p>", unsafe_allow_html=True)
-        usuarios = dados.ler_usuarios()
-        if not usuarios:
-            st.info("Nenhum usuário cadastrado.")
-            return
+        _tabela_usuarios()
 
-        logado = (st.session_state.get("usuario") or {}).get("usuario")
-        for u in usuarios:
-            l1, l2, l3, l4 = st.columns([2.5, 2, 1.2, 1.1])
-            l1.markdown(f"**{u['nome']}**  \n`{u['usuario']}`")
-            l2.markdown(f"{u['destino']}  \n<span style='color:#6e6e6e;font-size:12px'>"
-                        f"{u.get('email') or '— sem e-mail —'}</span>", unsafe_allow_html=True)
-            tag = "🛡️ Admin" if u["perfil"] == auth.PERFIL_ADM else "Operação"
-            l3.write(f"{tag}  \n{'🟢 Ativo' if u['ativo'] else '⚪ Inativo'}")
-            if u["usuario"] == logado:
-                l4.caption("você")
-            else:
-                rotulo = "Desativar" if u["ativo"] else "Ativar"
-                if l4.button(rotulo, key=f"tog_{u['usuario']}"):
-                    dados.definir_ativo(u["linha"], not u["ativo"])
-                    st.rerun()
+
+PERFIL_LABEL = {"admin": "Admin", "recebimento": "Recebimento", "operacao": "Operação"}
+
+
+def _tabela_usuarios():
+    usuarios = dados.ler_usuarios()
+    if not usuarios:
+        st.info("Nenhum usuário cadastrado.")
+        return
+
+    logado = (st.session_state.get("usuario") or {}).get("usuario")
+    linha_por_login = {u["usuario"]: u["linha"] for u in usuarios}
+    orig_ativo = {u["usuario"]: bool(u["ativo"]) for u in usuarios}
+
+    filtro = st.text_input("Buscar (nome, login, destino ou e-mail)", key="busca_users",
+                           placeholder="digite para filtrar...")
+    linhas = []
+    for u in usuarios:
+        alvo = f"{u['nome']} {u['usuario']} {u['destino']} {u.get('email','')}".lower()
+        if filtro and filtro.strip().lower() not in alvo:
+            continue
+        linhas.append({
+            "Nome": u["nome"], "Login": u["usuario"], "Destino": u["destino"],
+            "E-mail": u.get("email") or "", "Perfil": PERFIL_LABEL.get(u["perfil"], "Operação"),
+            "Ativo": bool(u["ativo"]),
+        })
+    if not linhas:
+        st.caption("Nenhum usuário para o filtro.")
+        return
+
+    df = pd.DataFrame(linhas)
+    edited = st.data_editor(
+        df, hide_index=True, width="stretch",
+        height=min(430, 40 * (len(df) + 1) + 3),
+        disabled=["Nome", "Login", "Destino", "E-mail", "Perfil"],
+        column_config={
+            "Login": st.column_config.TextColumn(width="small"),
+            "Perfil": st.column_config.TextColumn(width="small"),
+            "Ativo": st.column_config.CheckboxColumn("Ativo", help="Desmarque para desativar", width="small"),
+        },
+        key="editor_users",
+    )
+
+    c1, c2 = st.columns([1, 2])
+    if c1.button("Salvar alterações", type="primary", width="stretch"):
+        mudou, bloqueado = 0, False
+        for _, r in edited.iterrows():
+            login, novo = r["Login"], bool(r["Ativo"])
+            if novo == orig_ativo.get(login):
+                continue
+            if login == logado:
+                bloqueado = True
+                continue
+            dados.definir_ativo(linha_por_login[login], novo)
+            mudou += 1
+        if bloqueado:
+            st.warning("Você não pode alterar o próprio status — ignorado.")
+        if mudou:
+            st.success(f"{mudou} alteração(ões) salva(s).")
+            st.rerun()
+        elif not bloqueado:
+            st.info("Nenhuma alteração para salvar.")
+    c2.caption("Marque/desmarque **Ativo** e clique em salvar. Demais campos são só leitura.")
