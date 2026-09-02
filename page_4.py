@@ -57,6 +57,8 @@ def _card_devolucao(dev: dict, quem: str):
     c2.markdown(f"**Destino:** {dev.get('destino','')}")
     c3.markdown(f"**Placa:** {dev.get('placa','') or '—'}")
     c4.markdown(f"**Emissão:** {dev.get('data_criacao','')}")
+    if dev.get("local_devolucao"):
+        st.markdown(f"**Devolvendo para:** {dev.get('local_devolucao')}")
 
     # Já processada?
     if dev.get("status") != dp.STATUS_TRANSITO:

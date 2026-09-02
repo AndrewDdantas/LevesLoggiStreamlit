@@ -63,16 +63,21 @@ def page_3():
                     min_value=0, max_value=int(r["saldo"]), step=1, value=0,
                 )
             placa = st.text_input("Placa do veículo", placeholder="ex.: ABC1D23")
+            local = st.text_input("Devolvendo para (local/CD de destino)",
+                                  placeholder="ex.: CD Cajamar")
             obs = st.text_input("Observação (opcional)")
             enviar = st.form_submit_button("Gerar devolução", type="primary")
 
         if enviar:
             itens = [{"tipo": t, "qtd_declarada": int(q)} for t, q in qtds.items() if q > 0]
             placa_norm = "".join(str(placa or "").upper().split()).replace("-", "")
+            local_norm = str(local or "").strip()
             if not itens:
                 st.error("Informe ao menos uma quantidade.")
             elif not placa_norm:
                 st.error("Informe a placa do veículo.")
+            elif not local_norm:
+                st.error("Informe para onde está devolvendo.")
             else:
                 total = sum(it["qtd_declarada"] for it in itens)
                 id_dev = dados.proximo_codigo_devolucao()
@@ -84,7 +89,7 @@ def page_3():
                     "destino": destino, "status": dp.STATUS_TRANSITO,
                     "total_declarado": total, "total_recebido": "",
                     "data_recebimento": "", "recebido_por": "", "obs": obs,
-                    "placa": placa_norm,
+                    "placa": placa_norm, "local_devolucao": local_norm,
                 }
                 dados.criar_devolucao(dev, itens)
                 st.success(f"Devolução **{id_dev}** criada. Baixe o romaneio abaixo e envie com os itens.")

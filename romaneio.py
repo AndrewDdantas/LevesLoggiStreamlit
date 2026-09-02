@@ -89,6 +89,7 @@ def gerar_romaneio_pdf(dev: dict, itens: list[dict], base_url: str) -> bytes:
 
     linha("Operação:", dev.get("usuario", ""))
     linha("Destino:", dev.get("destino", ""))
+    linha("Devolver para:", dev.get("local_devolucao", "") or "—")
     linha("Veículo (placa):", dev.get("placa", "") or "—")
     linha("Data de emissão:", dev.get("data_criacao", ""))
     linha("Status:", dev.get("status", ""))
