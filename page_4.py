@@ -52,10 +52,11 @@ def _card_devolucao(dev: dict, quem: str):
              for _, r in itens_df.iterrows()]
 
     st.markdown(f"### {dev['id']}")
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
     c1.markdown(f"**Operação:** {dev.get('usuario','')}")
     c2.markdown(f"**Destino:** {dev.get('destino','')}")
-    c3.markdown(f"**Emissão:** {dev.get('data_criacao','')}")
+    c3.markdown(f"**Placa:** {dev.get('placa','') or '—'}")
+    c4.markdown(f"**Emissão:** {dev.get('data_criacao','')}")
 
     # Já processada?
     if dev.get("status") != dp.STATUS_TRANSITO:

@@ -62,13 +62,17 @@ def page_3():
                     f"{r['tipo'].title()} (máx. {_fmt(r['saldo'])})",
                     min_value=0, max_value=int(r["saldo"]), step=1, value=0,
                 )
+            placa = st.text_input("Placa do veículo", placeholder="ex.: ABC1D23")
             obs = st.text_input("Observação (opcional)")
             enviar = st.form_submit_button("Gerar devolução", type="primary")
 
         if enviar:
             itens = [{"tipo": t, "qtd_declarada": int(q)} for t, q in qtds.items() if q > 0]
+            placa_norm = "".join(str(placa or "").upper().split()).replace("-", "")
             if not itens:
                 st.error("Informe ao menos uma quantidade.")
+            elif not placa_norm:
+                st.error("Informe a placa do veículo.")
             else:
                 total = sum(it["qtd_declarada"] for it in itens)
                 id_dev = dados.proximo_codigo_devolucao()
@@ -80,6 +84,7 @@ def page_3():
                     "destino": destino, "status": dp.STATUS_TRANSITO,
                     "total_declarado": total, "total_recebido": "",
                     "data_recebimento": "", "recebido_por": "", "obs": obs,
+                    "placa": placa_norm,
                 }
                 dados.criar_devolucao(dev, itens)
                 st.success(f"Devolução **{id_dev}** criada. Baixe o romaneio abaixo e envie com os itens.")
@@ -105,7 +110,8 @@ def page_3():
         with st.container(border=True):
             c1, c2, c3, c4 = st.columns([2, 1.4, 1, 1.2])
             c1.markdown(f"**{d['id']}**  \n{d['data_criacao']}")
-            c2.markdown(dp.STATUS_LABEL.get(d["status"], d["status"]))
+            c2.markdown(dp.STATUS_LABEL.get(d["status"], d["status"])
+                        + (f"  \n🚚 {d.get('placa')}" if d.get("placa") else ""))
             c3.markdown(f"Total: **{_fmt(d['total_declarado'])}**")
             with c4:
                 itens = dp.itens_da_devolucao(d["id"])
